@@ -1,0 +1,17 @@
+# Ambiente virtual
+.venv/
+env/
+.env
+
+# Arquivos temporários Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+output_data/**/*.csv
+input_data/**/*.csv
+
+#Arquivos incompletos, de teste ou que serão descartados
+*.log
+test_dde
+
