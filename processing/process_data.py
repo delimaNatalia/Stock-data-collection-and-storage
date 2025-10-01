@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from datetime import date, time, datetime
 from . import renko
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -39,6 +40,20 @@ def get_file_path(folder_path = INPUT_FOLDER_PATH, source = "profit"):
 
     return df_path
 
+def rename_columns(df):
+    df = df.rename(columns={
+        'Preço': 'preco',
+        'Quantidade': 'quantidade',
+        'Data': 'data',
+        'Hora': 'hora',
+        'Comprador': 'comprador',
+        'Vendedor': 'vendedor',
+        'Tipo': 'tipo',
+        'Ativo': 'ativo'
+        })
+    return df
+
+
 def normalize_df(input_df_path):
 
     """
@@ -61,16 +76,8 @@ def normalize_df(input_df_path):
     df = pd.read_csv(input_file, sep=';', encoding='latin1')
 
     try:
-        df = df.rename(columns={
-        'Preço': 'preco',
-        'Quantidade': 'quantidade',
-        'Data': 'data',
-        'Hora': 'hora',
-        'Comprador': 'comprador',
-        'Vendedor': 'vendedor',
-        'Tipo': 'tipo',
-        'Ativo': 'ativo'
-        })
+        df = rename_columns(df)
+
     except Exception as e:
         print("Não foi possível renomear as colunas durante a normalização: ", e)
     print(df.head())
@@ -135,6 +142,10 @@ def save_tick_data_csv():
             "preco", "quantidade", "vendedor", "tipo"
         ])
         print("Building dataframe 'all_time_ticks' as a csv file")
+
+    if is_new_data_updated(new_data, older_data, use_df = True) == False:
+        return print("Dados não inseridos no csv: a data já está presente no conjunto de dados")
+    
     combined_df = pd.concat([older_data, new_data], ignore_index=True)
     combined_df.to_csv(older_data_path , sep=',', index=False, encoding='utf-8')     
 
@@ -171,21 +182,26 @@ def save_tick_data_db():
         except Exception as e:
             print("Não foi possível normalizar a nova tabela: ", e)
 
-    new_data = df_olders_first(new_data)
-    new_data["data"] = pd.to_datetime(new_data["data"], dayfirst=True, errors='coerce').dt.date
-    new_data["hora"] = pd.to_datetime(new_data["hora"], format="%H:%M:%S", errors='coerce').dt.time
+    if is_new_data_updated(new_data, "all_time_ticks") == False:
+        return print("Dados não inseridos no banco de dados: a data já está presente no banco de dados")
+    
+    else:
+    
+        new_data = df_olders_first(new_data)
+        new_data["data"] = pd.to_datetime(new_data["data"], dayfirst=True, errors='coerce').dt.date
+        new_data["hora"] = pd.to_datetime(new_data["hora"], format="%H:%M:%S", errors='coerce').dt.time
 
-   
-    try: 
-        with engine.begin() as conn:  # transaction-safe
-                # Inserts the new data
-                try:
-                    new_data.to_sql('all_time_ticks', conn, if_exists='append', index=False, method='multi', chunksize=500)
-                    print("Novos dados dados de ticks salvos com sucesso no banco de dados")
-                except SQLAlchemyError as e:
-                    print("Erro na inserção de dados pd to sql: ", e)
-    except Exception as e:
-        print("Erro na comunicação com o banco de dados")
+    
+        try: 
+            with engine.begin() as conn:  # transaction-safe
+                    # Inserts the new data
+                    try:
+                        new_data.to_sql('all_time_ticks', conn, if_exists='append', index=False, method='multi', chunksize=500)
+                        print("Novos dados dados de ticks salvos com sucesso no banco de dados")
+                    except SQLAlchemyError as e:
+                        print("Erro na inserção de dados pd to sql: ", e)
+        except Exception as e:
+            print("Erro na comunicação com o banco de dados")
 
 
 
@@ -279,6 +295,10 @@ def save_renko_csv(R_values = R_values):
                     print("Não foi possível ou necessário normalizar a nova tabela: ", e)
 
             
+            if is_new_data_updated(tick_df, previous_df, use_df = True) == False:
+                return print("Dados não inseridos na tabela renko: já existem dados para essa data")
+    
+
             trade_df = df_olders_first(tick_df)
            
 
@@ -294,7 +314,7 @@ def save_renko_csv(R_values = R_values):
                     renko_df.to_csv(os.path.join(OUTPUT_FOLDER_PATH, 'renko', f'{R}R', f'{symbol}_{R}R.csv' ), sep=',', index=False, encoding='utf-8')
                 except Exception as e:
                     print("Erro: ", e)
-            print("Novos dados renko salvos com sucesso nos arquivos ;csv")
+            print("Novos dados renko salvos com sucesso nos arquivos .csv")
         except Exception as e:
             print(f"Os dados do dia anterior não puderam ser processados ({R}R): ", e)
 
@@ -364,6 +384,9 @@ def save_renko_db(R_values = R_values):
                 except Exception as e:
                     print("Não foi possível ou necessário normalizar a nova tabela: ", e)
                     
+            
+            if is_new_data_updated(tick_df, f'{symbol}_{R}') == False:
+                return print("Dados não inseridos na tabela renko no banco de dados: já existem dados para essa data")
            
             trade_df = df_olders_first(tick_df)
     
@@ -392,8 +415,57 @@ def save_renko_db(R_values = R_values):
 
 
 
+def is_new_data_updated(new_df, table_name, use_df= False):
+
+    """
+    Checks if the new DataFrame contains more recent records compared to the stored data.
+
+    Parameters
+    ----------
+    new_df : pandas.DataFrame
+        DataFrame with the new data, containing the columns 'data' (date) and 'hora' (time).
+    table_name : str or pandas.DataFrame
+        If `use_df=False`, this should be the name of the table in the database.
+        If `use_df=True`, this should be a reference DataFrame.
+    use_df : bool, optional, default=False
+        Defines whether `table_name` is a database table (`False`) 
+        or a DataFrame (`True`).
+
+    Returns
+    -------
+    bool
+        True if `new_df` has a newer date/time than the last stored record,
+        False otherwise.
+    """
+       
+    if use_df == False:
+        query = f"SELECT data, hora FROM {table_name} ORDER BY data, hora DESC LIMIT 1"
+        last_update = pd.read_sql(query, engine)
+        if last_update.empty:
+            return True
+        last_date = pd.to_datetime(last_update['data'].iloc[0],  format="mixed", dayfirst=True).date()
+        last_time = pd.to_datetime(last_update['hora'].iloc[0], format="%H:%M:%S").time()
+
+    else:
+        last_update = table_name
+        if last_update is None or last_update.empty:
+            return True
+        last_date = pd.to_datetime(last_update['data'].iloc[-1],  format="mixed", dayfirst=True).date()
+        last_time = pd.to_datetime(last_update['hora'].iloc[-1], format="%H:%M:%S").time()
 
 
+    new_df = rename_columns(new_df)
+    new_df = new_df.sort_values(by=['data', 'hora'], ascending = False, inplace=False).head(1)
+    new_date = pd.to_datetime(new_df.iloc[0]['data'], format="mixed", dayfirst=True).date()
+    new_time = pd.to_datetime(new_df.iloc[0]['hora'], format="%H:%M:%S").time()
+
+    new_datetime = datetime.combine(new_date, new_time)
+    last_datetime = datetime.combine(last_date, last_time)
+
+    if (new_datetime > last_datetime):
+        return True
+    else:
+        return False
 
 
 

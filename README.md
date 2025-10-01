@@ -49,6 +49,44 @@ RenkoForge/
 ```bash
 pip install -r requirements.txt
 ```
+## Como Rodar / Usage 
+
+### Instalar dependências 
+
+    Certifique-se de estar no ambiente virtual do projeto.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+    Rode:
+```bash
+pip install -r requirements.txt
+```
+
+Isso inclui todas as bibliotecas necessárias, como python-dotenv. 
+
+### Configurar variáveis de ambiente Copie o arquivo .env.example para .env:
+
+```bash
+    cp .env.example .env  # ou copie manualmente
+```
+
+### Edite o arquivo .env com suas credenciais e configurações (usuario e senha do postgres) 
+
+### Criar o banco de dados 
+
+    Rode o script create_db.py para criar as tabelas iniciais no PostgreSQL, se ainda não existirem 
+
+### Preparar os dados de exemplo 
+    Copie os CSVs da pasta examples/ para input_data/ para testar o funcionamento do projeto.
+
+```bash
+    cp examples/*.csv input_data/  # ou copie manualmente
+```
+
+### Rodar o script principal (main.py)
+
+
 
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.

@@ -25,9 +25,9 @@ OUTPUT_FOLDER_PATH = 'output_data'
 try:
     with engine.connect() as conn:
         result = conn.execute(text("SELECT 1"))  
-        print("Conexão OK:", result.fetchone())
+        print("Teste de conexão: OK", result.fetchone())
 except Exception as e:
-    print("Erro ao conectar:", e)
+    print("Erro ao conectar-se ao banco de dados:", e)
 
 
 

@@ -15,7 +15,7 @@ input_data/**/*.csv
 #Arquivos incompletos, de teste ou que serão descartados
 *.log
 test_dde
-
+my_notes
 =======
 # Byte-compiled / optimized / DLL files
 __pycache__/

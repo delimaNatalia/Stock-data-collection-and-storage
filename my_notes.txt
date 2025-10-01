@@ -1,0 +1,33 @@
+To do:
+
+- Testar a função verify_date()
+- Aplicar no pipeline e testar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+To be done:
+
+- Mecanismo de verificação de data (okay, mas pensar nos casos de inserção no meio do dia)
+- Inserir mecanismo de coleta de dados do metatrader em caso de erro, configurável. Ou mensagem de erro apenas (caso Metatrade = False)
+- Vizualização de dados
+-  Filtragem de dados de leilão
+- Aplicar modelos de ML
+
+
+
+https://github.com/alpdias/economic-calendar/blob/master/README.md
+Caleendário economico
